@@ -27,10 +27,10 @@ rm -rf build/ || true
 
 # Build lzma always static because the runtime gets distributed with
 # the generated .AppImage file.
-if [ ! -e "./xz-5.2.3/build/lib/liblzma.a" ] ; then
-  wget -c http://tukaani.org/xz/xz-5.2.3.tar.gz
-  tar xf xz-5.2.3.tar.gz
-  cd xz-5.2.3
+if [ ! -e "./xz-5.2.5/build/lib/liblzma.a" ] ; then
+  wget -c http://tukaani.org/xz/xz-5.2.5.tar.gz
+  tar xf xz-5.2.5.tar.gz
+  cd xz-5.2.5
   mkdir -p build/lib
   CFLAGS="-Wall $small_FLAGS" ./configure --prefix=$(pwd)/build --libdir=$(pwd)/build/lib --enable-static --disable-shared
   make -j$JOBS && make install
@@ -62,10 +62,10 @@ if [ ! -e ./Makefile ] ; then
   autoreconf -fi || true # Errors out, but the following succeeds then?
   autoconf
   sed -i "" '/PKG_CHECK_MODULES.*/,/,:./d' configure # https://github.com/vasi/squashfuse/issues/12
-  CFLAGS="-Wall $small_FLAGS" ./configure --disable-demo --disable-high-level --without-lzo --without-lz4 --with-xz=$(pwd)/../xz-5.2.3/build
+  CFLAGS="-Wall $small_FLAGS" ./configure --disable-demo --disable-high-level --without-lzo --without-lz4 --with-xz=$(pwd)/../xz-5.2.5/build
 
   # Patch Makefile to use static lzma
-  sed -i "" "s|XZ_LIBS = -llzma  -L$(pwd)/../xz-5.2.3/build/lib|XZ_LIBS = -Bstatic -llzma  -L$(pwd)/../xz-5.2.3/build/lib|g" Makefile
+  sed -i "" "s|XZ_LIBS = -llzma  -L$(pwd)/../xz-5.2.5/build/lib|XZ_LIBS = -Bstatic -llzma  -L$(pwd)/../xz-5.2.5/build/lib|g" Makefile
 fi
 
 bash --version
@@ -83,8 +83,8 @@ fi
 cd squashfs-tools
 
 # Patch squashfuse-tools Makefile to link against static llzma
-sed -i "" "s|CFLAGS += -DXZ_SUPPORT|CFLAGS += -DXZ_SUPPORT -I../../xz-5.2.3/build/include|g" Makefile
-sed -i "" "s|LIBS += -llzma|LIBS += -Bstatic -llzma  -L../../xz-5.2.3/build/lib|g" Makefile
+sed -i "" "s|CFLAGS += -DXZ_SUPPORT|CFLAGS += -DXZ_SUPPORT -I../../xz-5.2.5/build/include|g" Makefile
+sed -i "" "s|LIBS += -llzma|LIBS += -Bstatic -llzma  -L../../xz-5.2.5/build/lib|g" Makefile
 
 make -j$JOBS XZ_SUPPORT=1 mksquashfs # LZ4_SUPPORT=1 did not build yet on CentOS 6
 $STRIP mksquashfs
@@ -109,7 +109,7 @@ $CC -DGIT_COMMIT=\"$(git describe --tags --always --abbrev=7)\" -D_FILE_OFFSET_B
   # statically link against liblzma
   $CC -o appimagetool appimagetool.o ../elf.c ../getsection.c -DENABLE_BINRELOC ../binreloc.c \
     ../squashfuse/.libs/libsquashfuse.a ../squashfuse/.libs/libfuseprivate.a \
-    -L../xz-5.2.3/build/lib \
+    -L../xz-5.2.5/build/lib \
      -ldl -lpthread \
      $(pkg-config --cflags --libs glib-2.0) -lz  -llzma 
 
