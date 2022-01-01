@@ -116,6 +116,8 @@ typedef struct elf32_note {
 #define EI_CLASS    4
 #define EI_DATA     5
 
+ssize_t get_elf_size(const char *fname);
+
 #ifdef __cplusplus
 }
 #endif

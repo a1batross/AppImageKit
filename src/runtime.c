@@ -51,6 +51,8 @@
 #include <appimage/appimage_shared.h>
 #include <hashlib.h>
 
+#include "light_elf.h"
+
 #ifndef ENABLE_DLOPEN
 #define ENABLE_DLOPEN
 #endif
@@ -64,7 +66,6 @@
  */
 #define EXIT_EXECERROR  127     /* Execution error exit status.  */
 
-//#include "notify.c"
 extern int notify(char *title, char *body, int timeout);
 struct stat st;
 
@@ -587,7 +588,7 @@ int main(int argc, char *argv[]) {
             strcpy(temp_base, getenv("TMPDIR"));
     }
 
-    fs_offset = appimage_get_elf_size(appimage_path);
+    fs_offset = get_elf_size(appimage_path);
 
     // error check
     if (fs_offset < 0) {

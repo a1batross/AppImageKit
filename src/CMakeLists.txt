@@ -17,6 +17,7 @@ include(build-runtime.cmake)
 
 
 add_executable(appimagetool
+    elf.c
     appimagetool.c
     binreloc.c
     runtime_embed.o
