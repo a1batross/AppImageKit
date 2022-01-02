@@ -66,7 +66,12 @@ enum fARCH {
     fARCH_i386,
     fARCH_x86_64,
     fARCH_arm,
-    fARCH_aarch64
+    fARCH_aarch64,
+    fARCH_e2kv3,
+    fARCH_e2kv4,
+    fARCH_e2kv5,
+    fARCH_e2kv6,
+    fARCH_LAST
 };
 
 static gchar const APPIMAGEIGNORE[] = ".appimageignore";
@@ -289,7 +294,7 @@ static void replacestr(char *line, const char *search, const char *replace)
 int count_archs(bool* archs) {
     int countArchs = 0;
     int i;
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < fARCH_LAST; i++) {
         countArchs += archs[i];
     }
     return countArchs;
@@ -304,11 +309,20 @@ gchar* getArchName(bool* archs) {
         return "armhf";
     else if (archs[fARCH_aarch64])
         return "aarch64";
+    else if (archs[fARCH_e2kv3])
+        return "e2kv3";
+    else if (archs[fARCH_e2kv4])
+        return "e2kv4";
+    else if (archs[fARCH_e2kv5])
+        return "e2kv5";
+    else if (archs[fARCH_e2kv6])
+        return "e2kv6";
     else
         return "all";
 }
 
-void extract_arch_from_e_machine_field(int16_t e_machine, const gchar* sourcename, bool* archs) {
+void extract_arch_from_elf_fields(int16_t e_machine, uint32_t e_flags, const gchar* sourcename, bool* archs)
+{
     if (e_machine == 3) {
         archs[fARCH_i386] = 1;
         if(verbose)
@@ -325,6 +339,22 @@ void extract_arch_from_e_machine_field(int16_t e_machine, const gchar* sourcenam
         archs[fARCH_arm] = 1;
         if(verbose)
             fprintf(stderr, "%s used for determining architecture armhf\n", sourcename);
+    }
+
+    if (e_machine == 175) {
+        uint32_t mach = (e_flags >> 24) & 255;
+
+        switch(mach)
+        {
+        case 3:
+        default: archs[fARCH_e2kv3] = 1; break;
+        case 4: archs[fARCH_e2kv4] = 1; break;
+        case 5: archs[fARCH_e2kv5] = 1; break;
+        case 6: archs[fARCH_e2kv6] = 1; break;
+        }
+
+        if(verbose)
+            fprintf(stderr, "%s used for determining architecture e2k\n", sourcename);
     }
 
     if (e_machine == 183) {
@@ -364,27 +394,65 @@ void extract_arch_from_text(gchar *archname, const gchar* sourcename, bool* arch
                 archs[fARCH_aarch64] = 1;
                 if (verbose)
                     fprintf(stderr, "%s used for determining architecture ARM aarch64\n", sourcename);
+            } else if (g_ascii_strncasecmp("e2kv3", archname, 20) == 0) {
+                archs[fARCH_e2kv3] = 1;
+                if (verbose)
+                    fprintf(stderr, "%s used for determining architecture e2kv3\n", sourcename);
+            } else if (g_ascii_strncasecmp("e2kv4", archname, 20) == 0) {
+                archs[fARCH_e2kv4] = 1;
+                if (verbose)
+                    fprintf(stderr, "%s used for determining architecture e2kv4\n", sourcename);
+            } else if (g_ascii_strncasecmp("e2kv5", archname, 20) == 0) {
+                archs[fARCH_e2kv5] = 1;
+                if (verbose)
+                    fprintf(stderr, "%s used for determining architecture e2kv5\n", sourcename);
+            } else if (g_ascii_strncasecmp("e2kv6", archname, 20) == 0) {
+                archs[fARCH_e2kv6] = 1;
+                if (verbose)
+                    fprintf(stderr, "%s used for determining architecture e2kv6\n", sourcename);
             }
         }
     }
 }
 
-int16_t read_elf_e_machine_field(const gchar* file_path) {
-    int16_t e_machine = 0x00;
+void read_elf_fields(const gchar* file_path, int16_t *e_machine, int32_t *e_flags) {
     FILE* file = 0;
+    unsigned char class;
+
     file = fopen(file_path, "rb");
-    if (file) {
-        fseek(file, 0x12, SEEK_SET);
-        fgets((char*) (&e_machine), 0x02, file);
+
+    *e_machine = 0x00;
+    *e_flags = 0x00;
+
+    if (!file)
+        return;
+
+    fseek(file, EI_CLASS, SEEK_SET);
+    fread(&class, sizeof(class), 1, file);
+
+    fseek(file, 0x12, SEEK_SET);
+    fread(e_machine, sizeof(*e_machine), 1, file);
+
+    if(class == ELFCLASS32)
+        fseek(file, 0x24, SEEK_SET);
+    else if(class == ELFCLASS64)
+        fseek(file, 0x30, SEEK_SET);
+    else
+    {
         fclose(file);
+        return;
     }
 
-    return e_machine;
+    fread(e_flags, sizeof(*e_flags), 1, file);
+
+    fclose(file);
 }
 
 void guess_arch_of_file(const gchar *archfile, bool* archs) {
-    int16_t e_machine_field = read_elf_e_machine_field(archfile);
-    extract_arch_from_e_machine_field(e_machine_field, archfile, archs);
+    int16_t e_machine;
+    uint32_t e_flags;
+    read_elf_fields(archfile, &e_machine, &e_flags);
+    extract_arch_from_elf_fields(e_machine, e_flags, archfile, archs);
 }
 
 void find_arch(const gchar *real_path, const gchar *pattern, bool* archs) {
@@ -721,7 +789,7 @@ main (int argc, char *argv[])
         }
 
         /* Determine the architecture */
-        bool archs[4] = {0, 0, 0, 0};
+        bool archs[fARCH_LAST] = { 0 };
         extract_arch_from_text(getenv("ARCH"), "Environmental variable ARCH", archs);
         if (count_archs(archs) != 1) {
             /* If no $ARCH variable is set check a file */
