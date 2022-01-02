@@ -44,7 +44,10 @@ cp "$install_prefix"/usr/lib/appimagekit/mksquashfs "$appimagetool_appdir"/usr/l
 # prefer binaries from /deps, if available
 export PATH=/deps/bin:"$PATH"
 cp "$(which desktop-file-validate)" "$appimagetool_appdir"/usr/bin/
-cp "$(which zsyncmake)" "$appimagetool_appdir"/usr/bin/
+
+if [ "$(which zsyncmake)" != "" ]; then
+	cp "$(which zsyncmake)" "$appimagetool_appdir"/usr/bin/
+fi
 
 cp "$repo_root"/resources/appimagetool.desktop "$appimagetool_appdir"
 cp "$repo_root"/resources/appimagetool.png "$appimagetool_appdir"/appimagetool.png
